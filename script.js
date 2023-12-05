@@ -24,7 +24,7 @@ const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
 class Workouts {
-  #ID = Date.now();
+  ID = Date.now();
   date = new Date();
   constructor(coords, distance, duration) {
     this.coords = coords;
@@ -66,6 +66,7 @@ class App {
     this.#getPosition();
     inputType.addEventListener('change', () => this.#ToggleElv());
     form.addEventListener('submit', e => this.#newWorkout(e));
+    containerWorkouts.addEventListener('click', e => this.#moveToMarker(e));
   }
 
   #getPosition() {
@@ -254,6 +255,21 @@ class App {
     }
 
     form.insertAdjacentHTML('afterend', html);
+  }
+
+  #moveToMarker(e) {
+    const targetedWorkout = e.target.closest('.workout');
+    if (targetedWorkout) {
+      const workout = this.#workouts.find(
+        workout => workout.ID == targetedWorkout.dataset.id
+      );
+      this.#map.setView([...workout.coords], 13, {
+        animate: true,
+        pan: {
+          duration: 1,
+        },
+      });
+    }
   }
 }
 
