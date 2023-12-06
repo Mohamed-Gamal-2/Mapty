@@ -22,6 +22,9 @@ const inputDistance = document.querySelector('.form__input--distance');
 const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
+const clearAllBtn = document.querySelector('.clear-all-btn');
+const sort = document.querySelector('#sort');
+const removeSort = document.querySelector('#remove-sort');
 
 class Workouts {
   ID = Date.now();
@@ -34,6 +37,7 @@ class Workouts {
 }
 
 class Running extends Workouts {
+  type = 'running';
   constructor(coords, distance, duration, cadence) {
     super(coords, distance, duration);
     this.cadence = cadence;
@@ -46,6 +50,7 @@ class Running extends Workouts {
   }
 }
 class Cycling extends Workouts {
+  type = 'cycling';
   constructor(coords, distance, duration, elevation) {
     super(coords, distance, duration);
     this.elevation = elevation;
@@ -61,12 +66,20 @@ class Cycling extends Workouts {
 class App {
   #map;
   #mapEventObj;
-  #workouts = [];
+  #workouts = JSON.parse(localStorage.getItem('workouts')) || [];
+  #sorted = localStorage.getItem('sorted') || undefined;
   constructor() {
     this.#getPosition();
     inputType.addEventListener('change', () => this.#ToggleElv());
     form.addEventListener('submit', e => this.#newWorkout(e));
-    containerWorkouts.addEventListener('click', e => this.#moveToMarker(e));
+    containerWorkouts.addEventListener('click', e => {
+      this.#moveToMarker(e);
+      this.#clearWorkout(e);
+    });
+    this.#workouts && this.#getLocalStorage();
+    clearAllBtn.addEventListener('click', () => this.#clearAll());
+    sort.addEventListener('click', () => this.#sort());
+    // removeSort.addEventListener('click', () => this.#removeSort());
   }
 
   #getPosition() {
@@ -92,6 +105,10 @@ class App {
 
     this.#showCurrPosition(location);
     this.#showForm();
+    this.#workouts &&
+      this.#workouts.forEach(workout => {
+        this.#renderMarker(workout);
+      });
   }
 
   #showCurrPosition(location) {
@@ -171,26 +188,35 @@ class App {
       Workout = new Cycling([lat, lng], distance, duration, elevation);
       this.#workouts.push(Workout);
     }
-    this.#renderMarker(lat, lng, type);
-    this.#renderWorkout(Workout, type);
+    this.#renderMarker(Workout);
+    this.#renderWorkout(Workout);
     this.#hideForm();
+    this.#storeWorkout();
   }
 
-  #renderMarker(lat, lng, type) {
-    console.log(type);
+  #renderMarker(Workout) {
+    const timeOptions = { month: 'long', day: 'numeric' };
     const popUpOptions = {
       maxWidth: 250,
       minWidth: 100,
       autoClose: false,
       closeOnClick: false,
-      className: `${type}-popup`,
+      className: `${Workout.type}-popup`,
     };
 
     //Showing Marker on submitting form
-    L.marker([lat, lng])
+    L.marker(Workout.coords)
       .addTo(this.#map)
       .bindPopup(L.popup(popUpOptions))
-      .setPopupContent('Workout')
+      .setPopupContent(
+        `${Workout.type == 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${
+          Workout.type[0].toUpperCase() + Workout.type.slice(1)
+        } on ${Intl.DateTimeFormat('en-GB', timeOptions).format(
+          typeof Workout.date == 'string'
+            ? new Date(Workout.date)
+            : Workout.date
+        )}`
+      )
       .openPopup();
     inputDistance.value =
       inputCadence.value =
@@ -199,19 +225,18 @@ class App {
         '';
   }
 
-  #renderWorkout(workout, type) {
-    console.log(workout);
+  #renderWorkout(workout) {
     const timeOptions = { month: 'long', day: 'numeric' };
     let html = `
-    <li class="workout workout--${type}" data-id="${workout.ID}">
+    <li class="workout workout--${workout.type}" data-id="${workout.ID}">
         <h2 class="workout__title">${
-          type[0].toUpperCase() + type.slice(1)
+          workout.type[0].toUpperCase() + workout.type.slice(1)
         } on ${Intl.DateTimeFormat('en-GB', timeOptions).format(
-      workout.date
+      typeof workout.date == 'string' ? new Date(workout.date) : workout.date
     )}</h2>
         <div class="workout__details">
             <span class="workout__icon">${
-              type == 'running' ? '🏃‍♂️' : '🚴‍♀️'
+              workout.type == 'running' ? '🏃‍♂️' : '🚴‍♀️'
             }</span>
             <span class="workout__value">${workout.distance}</span>
             <span class="workout__unit">km</span>
@@ -223,7 +248,7 @@ class App {
         </div>
         `;
 
-    if (type == 'running') {
+    if (workout.type == 'running') {
       html += `
             <div class="workout__details">
                 <span class="workout__icon">⚡️</span>
@@ -235,10 +260,9 @@ class App {
                 <span class="workout__value">${workout.cadence}</span>
                 <span class="workout__unit">spm</span>
           </div>
-        </li>
             `;
     }
-    if (type == 'cycling') {
+    if (workout.type == 'cycling') {
       html += `
             <div class="workout__details">
                 <span class="workout__icon">⚡️</span>
@@ -250,16 +274,29 @@ class App {
             <span class="workout__value">${workout.elevation}</span>
             <span class="workout__unit">m</span>
             </div>
-        </li>
+        
             `;
     }
+
+    html += `
+        <div></div>
+        <div></div>
+        <div></div>
+        <div class="modifying-btn">
+            <i class="fa-solid fa-pen-to-square fa-2x updating" style="color: #00c46a;" ></i>
+            <i class="fa-solid fa-trash fa-2x deleting " id="deleting-${workout.ID}" style="color: #ff0000;"></i>
+        </div>
+    </li>`;
 
     form.insertAdjacentHTML('afterend', html);
   }
 
   #moveToMarker(e) {
+    const modifying =
+      e.target.classList.contains('updating') ||
+      e.target.classList.contains('deleting');
     const targetedWorkout = e.target.closest('.workout');
-    if (targetedWorkout) {
+    if (targetedWorkout && !modifying) {
       const workout = this.#workouts.find(
         workout => workout.ID == targetedWorkout.dataset.id
       );
@@ -271,6 +308,70 @@ class App {
       });
     }
   }
+
+  #storeWorkout() {
+    localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+  }
+
+  #getLocalStorage() {
+    this.#workouts.forEach(workout => {
+      this.#renderWorkout(workout);
+    });
+  }
+
+  #clearAll() {
+    localStorage.getItem('workouts') && location.reload();
+    localStorage.removeItem('workouts');
+  }
+
+  #clearWorkout(e) {
+    const deletingBtn = e.target;
+    if (deletingBtn.classList.contains('deleting')) {
+      const workoutId = deletingBtn.id.split('-')[1];
+      this.#workouts = this.#workouts.filter(
+        workout => workout.ID != workoutId
+      );
+      localStorage.removeItem('workouts');
+      this.#workouts &&
+        localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+      location.reload();
+    }
+  }
+
+  #sort() {
+    if (!this.#sorted || this.#sorted == 'descending') {
+      localStorage.removeItem('sorted');
+      localStorage.setItem('sorted', 'ascending');
+      this.#workouts.sort((a, b) => b.distance - a.distance);
+      localStorage.removeItem('workouts');
+      localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+      location.reload();
+    }
+    if (this.#sorted == 'ascending') {
+      localStorage.removeItem('sorted');
+      localStorage.setItem('sorted', 'descending');
+      this.#workouts.sort((a, b) => a.distance - b.distance);
+      localStorage.removeItem('workouts');
+      localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+      location.reload();
+    }
+  }
+
+  // #removeSort() {
+  //   if (this.#sorted) {
+  //     localStorage.removeItem('sorted');
+  //     localStorage.removeItem('workouts');
+  //     const notsorted = JSON.parse(localStorage.getItem('notsorted'));
+  //     localStorage.removeItem('notsorted');
+  //     console.log(notsorted);
+  //     localStorage.setItem('workouts', JSON.stringify(notsorted));
+  //     location.reload();
+  //   }
+  // }
+  //update
+  //show all workouts on map
+  //draw lines
+  //weather
 }
 
 const app = new App();

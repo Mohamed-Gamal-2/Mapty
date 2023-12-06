@@ -52,7 +52,19 @@ a:visited {
 .logo {
   height: 5.2rem;
   align-self: center;
-  margin-bottom: 4rem;
+}
+
+.sort-delete-btns {
+  margin: 2rem 0 2rem auto;
+}
+
+.sort-delete-btns .fa-arrow-down-wide-short {
+  cursor: pointer;
+}
+
+.sort-delete-btns .fa-xmark {
+  cursor: pointer;
+  margin-left: 1rem;
 }
 
 .workouts {
@@ -172,7 +184,7 @@ a:visited {
 }
 
 .copyright {
-  margin-top: auto;
+  margin-top: 1rem;
   font-size: 1.3rem;
   text-align: center;
   color: var(--color-light--1);
@@ -217,4 +229,23 @@ a:visited {
 }
 .cycling-popup .leaflet-popup-content-wrapper {
   border-left: 5px solid var(--color-brand--1);
+}
+
+.clear-all-btn {
+  background-color: red;
+  color: white;
+  width: 50%;
+  display: block;
+  margin: auto;
+  cursor: pointer;
+  padding: 5px 0;
+  border-radius: 5px;
+  outline: none;
+  border: none;
+}
+
+.modifying-btn {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
 }
